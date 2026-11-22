@@ -181,6 +181,14 @@ async function processYemot() {
     seen.add(ph); live.push(v);
   }
   if (!live.length) return { processed: 0 };
+  // מגבלת שיחות ליום (חיסכון ביחידות) – 0 = בלי מגבלה
+  const limit = +(getSetting('daily_call_limit') || 0);
+  if (limit > 0) {
+    const today = db.prepare("SELECT COUNT(*) n FROM voice_calls WHERE date(created_at) = date('now','localtime') AND status NOT IN ('queued','cancelled') AND trigger NOT IN ('login_code','warmup','inbound')").get().n;
+    const left = Math.max(0, limit - today);
+    if (!left) return { processed: 0, skipped: 'daily_limit' };
+    live.splice(left);
+  }
   yemotBusy = true;
   let processed = 0;
   try {
@@ -211,9 +219,23 @@ async function processYemot() {
   return { processed };
 }
 // שיחה שנשלחה ולא נענתה תוך 6 שעות – "לא נענתה"
+// חיוג חוזר אוטומטי למי שלא ענה: אחרי X שעות, עד N פעמים (0 = כבוי)
+function retryUnanswered() {
+  const hours = +(getSetting('retry_unanswered_hours') || 0); const max = +(getSetting('retry_unanswered_max') || 0);
+  if (!(hours > 0 && max > 0)) return 0;
+  const rows = db.prepare(`SELECT * FROM voice_calls v WHERE status = 'no_answer' AND trigger NOT IN ('login_code','warmup','inbound') AND COALESCE(attempt,1) <= ?
+    AND julianday('now','localtime') - julianday(updated_at) > ? AND NOT EXISTS (SELECT 1 FROM voice_calls w WHERE w.contact_id = v.contact_id AND w.id > v.id)`).all(max, hours / 24);
+  let n = 0;
+  for (const v of rows) {
+    db.prepare(`INSERT INTO voice_calls (case_id, contact_id, phone, message_text, parts_json, event_ids, case_ids, menu_json, trigger, reminder_no, status, attempt, created_by, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?, 'queued', ?, ?, ?, ?)`).run(v.case_id, v.contact_id, v.phone, v.message_text, v.parts_json, v.event_ids, v.case_ids, v.menu_json, v.trigger, v.reminder_no, (v.attempt || 1) + 1, v.created_by, now(), now());
+    n++;
+  }
+  return n;
+}
 function markUnanswered() {
   db.prepare("UPDATE voice_calls SET status='no_answer', updated_at=? WHERE status='sent' AND julianday('now','localtime') - julianday(updated_at) > 0.0105").run(now());
   db.prepare("UPDATE voice_calls SET status='failed', error='השליחה לא הושלמה', updated_at=? WHERE status='sending' AND julianday('now','localtime') - julianday(updated_at) > 0.02").run(now());
 }
 
-module.exports = { inSendWindow, outboundText, menuText, processYemot, markUnanswered, emailStatus, testEmail, sendMail, queueEmail, flushOutbox, phoneStatus, queueCall, processCallQueue, voiceText };
+module.exports = { retryUnanswered, inSendWindow, outboundText, menuText, processYemot, markUnanswered, emailStatus, testEmail, sendMail, queueEmail, flushOutbox, phoneStatus, queueCall, processCallQueue, voiceText };

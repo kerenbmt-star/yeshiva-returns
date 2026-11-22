@@ -155,6 +155,7 @@ async function tick() {
     await flushOutbox();
     await processCallQueue();
     markUnanswered();
+    require('./integrations').retryUnanswered();
   } catch (e) {
     console.error('[scheduler]', e);
   }

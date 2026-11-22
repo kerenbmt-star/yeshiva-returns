@@ -389,6 +389,8 @@ function handleIvr(q) {
   if (!opts) { opts = M().buildMenu([...new Set(cases.map((c) => c.source_id).filter(Boolean))]); db.prepare('UPDATE voice_calls SET menu_json = ? WHERE id = ?').run(JSON.stringify(opts), v.id); }
 
   if (q.hangup === 'yes') {
+    // שיחת חימום הסתיימה – משחררים מיד את ההודעות שחיכו לה
+    if (v.trigger === 'warmup') setTimeout(() => require('./integrations').processYemot().catch(() => {}), 1500);
     if (v.audio_file) { deleteAudio(v.audio_file); db.prepare('UPDATE voice_calls SET audio_file = NULL WHERE id = ?').run(v.id); }
     if (!v.listen_status) {
       const r = finishListen(v, ts, !!v.digit_pressed);

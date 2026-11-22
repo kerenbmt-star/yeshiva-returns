@@ -20,7 +20,10 @@ const money = (n) => '₪' + Number(n || 0).toLocaleString('he-IL', { minimumFra
 // תאריך עברי (יום וחודש באותיות) – מוצג ליד כל תאריך
 const GEM = (n) => { const o = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'], t = ['', 'י', 'כ', 'ל']; if (n === 15) return 'ט״ו'; if (n === 16) return 'ט״ז'; const s = t[Math.floor(n / 10)] + o[n % 10]; return s.length > 1 ? s.slice(0, -1) + '״' + s.slice(-1) : s + '׳'; };
 let heFmt = null;
+const ACCENTS = { blue: ['#1d4e89', '#163d6c', '#e8f0fa'], navy: ['#13294b', '#0c1d36', '#e9edf5'], teal: ['#0e7490', '#0b5e74', '#e0f2fe'], green: ['#2f6b4f', '#24543e', '#e3efe6'], purple: ['#5b21b6', '#4c1d95', '#efe9fb'], brown: ['#7a5230', '#5f3f24', '#f3ebe2'] };
+function applyAccent(k) { const a = ACCENTS[k]; const r = document.documentElement.style; if (!a) { ['--primary', '--primary-hover', '--primary-soft'].forEach((v) => r.removeProperty(v)); return; } r.setProperty('--primary', a[0]); r.setProperty('--primary-hover', a[1]); r.setProperty('--primary-soft', a[2]); }
 function hebShort(y, mo, d) {
+  if (state.prefs && state.prefs.hebDates === false) return '';
   try {
     heFmt = heFmt || new Intl.DateTimeFormat('he-u-ca-hebrew', { day: 'numeric', month: 'long' });
     const p = heFmt.formatToParts(new Date(+y, +mo - 1, +d, 12));
@@ -778,7 +781,7 @@ async function renderSettings() {
   let icons = {}; try { icons = JSON.parse(s.tab_icons || '{}'); } catch (_) { icons = {}; }
   const TABS = [['today', 'היום שלי'], ['cases', 'תיקים'], ['admin', 'דשבורד מנהל'], ['control', 'מסך בקרה'], ['people', 'אנשי קשר'], ['voice', 'הודעות קוליות'], ['workers', 'עובדים'], ['sources', 'מוסדות'], ['import', 'ייבוא'], ['automation', 'תזכורות'], ['settings', 'הגדרות']];
   $app.innerHTML = shell('settings', `
-    <div class="page-head"><div><h1>הגדרות</h1><p class="sub">הגדרות כלליות, חיבור שירותים חיצוניים, גיבוי וייצוא</p></div></div>
+    <div class="page-head"><div><h1>הגדרות</h1><p class="sub">כל ההגדרות לפי קטגוריות. אפשר גם לחפש הגדרה</p></div><input type="search" id="setQ" class="search" placeholder="🔍 חיפוש הגדרה – למשל: שבת, מהירות, מייל"></div>
     <form id="sf">
     <div class="card"><h2>נוסחי ההודעות הקוליות</h2>
       <div class="notice info"><strong>כאן אפשר לשנות כל מילה שהמערכת אומרת בטלפון.</strong> מה שבתוך [סוגריים] המערכת ממלאת לבד לכל אדם:
@@ -867,6 +870,22 @@ async function renderSettings() {
       ${inp('org_name', 'שם הארגון')}
       ${inp('stale_days', 'תזכורת על תיק שלא טופל לאחר (ימים)', 'number', 'min="1" max="90"')}
     </div></div>
+    <div class="card"><h2>מראה ותצוגה</h2><div class="grid3">
+      ${sel('accent_color', 'צבע ראשי של המערכת', [['', 'כחול (ברירת מחדל)'], ['navy', 'כחול כהה'], ['teal', 'טורקיז'], ['green', 'ירוק'], ['purple', 'סגול'], ['brown', 'חום']])}
+      ${sel('show_hebrew_dates', 'תאריך עברי ליד כל תאריך', [['1', 'להציג'], ['0', 'לא להציג']])}
+      ${sel('admin_home', 'דף הבית של המנהל', [['control', 'מסך בקרה'], ['today', 'היום שלי']])}
+    </div></div>
+    <div class="card"><h2>שליחה חכמה וחיסכון ביחידות</h2><div class="grid2">
+      ${inp('daily_call_limit', 'מקסימום שיחות ביום (0 = בלי הגבלה)', 'number', 'min="0" max="5000"')}
+      ${inp('min_days_between_auto', 'הודעות אוטומטיות: לא יותר מאחת לאדם בכל X ימים (0 = בלי הגבלה)', 'number', 'min="0" max="60"')}
+      ${inp('retry_unanswered_hours', 'חיוג חוזר למי שלא ענה – אחרי X שעות (0 = כבוי)', 'number', 'min="0" max="168"')}
+      ${inp('retry_unanswered_max', 'כמה חיוגים חוזרים לכל היותר', 'number', 'min="0" max="5"')}
+      ${inp('callback_same_minutes', 'מי שמתקשר בחזרה תוך X דקות – ישמע את אותה הודעה שקיבל (אחר כך: ההודעה המאוחדת)', 'number', 'min="2" max="120"')}
+      ${sel('warm_check', 'לפני שליחה – לבדוק אם יש חלקים חדשים ולהציע שיחת חימום', [['1', 'כן (מומלץ)'], ['0', 'לא']])}
+    </div><p class="small muted">חיוג חוזר ומגבלת שיחות לא פועלים בשבת וחג ומחוץ לשעות השליחה – השיחות מחכות לחלון הבא.</p></div>
+    <div class="card"><h2>אבטחה</h2><div class="grid2">
+      ${inp('session_days', 'כמה ימים להישאר מחובר במחשב (1–90)', 'number', 'min="1" max="90"')}
+    </div></div>
     <div class="card"><h2>שעות התזכורות</h2><div class="grid3">
       ${inp('morning_hour', 'מייל בוקר "היום שלך" (שעה)', 'number', 'min="5" max="12"')}
       ${inp('nudge_hour', 'תזכורת "עוד לא דיברת היום" (שעה)', 'number', 'min="9" max="20"')}
@@ -922,12 +941,12 @@ async function renderSettings() {
       <div class="field" style="margin-top:12px"><label>נוסח ברירת מחדל להודעה (כל סוג קובץ יכול לקבל נוסח משלו)</label><textarea name="phone_message">${esc(s.phone_message || '')}</textarea></div>
       <p class="small muted">שיחות יוצאות רק בימים א'–ה' בין 9:00 ל-20:00. מי שכבר שילם לא יקבל שיחה.</p>
     </div>
-    <div class="row" style="margin:16px 0"><button class="btn primary">שמירת הגדרות</button></div>
-    </form>
     <div class="card"><h2>גיבוי וייצוא</h2>
       <p class="small muted">המערכת שומרת גיבוי אוטומטי יומי של מסד הנתונים בתיקייה data/backups (30 אחרונים). מומלץ גם להוריד גיבוי מדי פעם ולשמור מחוץ לשרת.</p>
       <div class="row"><a class="btn" href="/api/export.xlsx">ייצוא כל הנתונים ל-Excel</a><a class="btn" href="#/report">🖨️ דוח מסודר כ-PDF</a><a class="btn" href="/api/backup">הורדת גיבוי מלא של מסד הנתונים</a></div>
-    </div>`);
+    </div>
+    <div class="row" style="margin:16px 0"><button class="btn primary">שמירת הגדרות</button></div>
+    </form>`);
   bindShell();
   const prep = () => {
     document.getElementById('voiceDays').value = [...document.querySelectorAll('[data-day]')].filter((c) => c.checked).map((c) => c.dataset.day).join(',');
@@ -942,6 +961,35 @@ async function renderSettings() {
     rd.readAsDataURL(f);
   };
   const fd2 = document.getElementById('favDel'); if (fd2) fd2.onclick = async () => { await api('POST', '/api/settings/favicon', { data_url: '' }); setFavicon(true); renderSettings(); };
+  // סידור לפי קטגוריות: תפריט בצד + חיפוש בכל ההגדרות
+  const CATS = [
+    ['general', '⚙️ כללי ומראה', ['כללי', 'מראה ותצוגה', 'סמלים']],
+    ['texts', '📝 נוסחי ההודעות', ['נוסחי ההודעות']],
+    ['phone', '📞 טלפון ושיחות', ['המוקד הטלפוני', 'שליחה חכמה', 'הודעות קוליות – ימות המשיח']],
+    ['times', '🕯️ זמנים, שבת וחג', ['זמני שליחת', 'שבת וחג']],
+    ['auto', '🤖 אוטומציות ותזכורות', ['הודעה חודשית', 'התראה על אמצעי תשלום', 'שעות התזכורות']],
+    ['stt', '🎙️ תמלול', ['תמלול']],
+    ['security', '🔑 כניסה ואבטחה', ['דרכי כניסה', 'אבטחה']],
+    ['mail', '✉️ מייל', ['שירות מייל', 'SMTP']],
+    ['backup', '💾 גיבוי וייצוא', ['גיבוי וייצוא']],
+  ];
+  const form = document.getElementById('sf');
+  const cards = [...form.querySelectorAll(':scope > .card')];
+  const catOf = (c) => { const t = (c.querySelector('h2') || {}).textContent || ''; const f = CATS.find(([, , keys]) => keys.some((k) => t.includes(k))); return f ? f[0] : 'general'; };
+  cards.forEach((c) => (c.dataset.cat = catOf(c)));
+  const wrap = document.createElement('div'); wrap.className = 'set-layout';
+  const nav = document.createElement('nav'); nav.className = 'set-nav';
+  nav.innerHTML = CATS.map(([k, l]) => `<button type="button" data-cat="${k}">${l}<span class="cnt">${cards.filter((c) => c.dataset.cat === k).length}</span></button>`).join('');
+  form.parentNode.insertBefore(wrap, form); wrap.appendChild(nav); wrap.appendChild(form);
+  const show = (k) => { state.setCat = k; nav.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.cat === k)); cards.forEach((c) => (c.hidden = c.dataset.cat !== k)); };
+  nav.querySelectorAll('button').forEach((b) => (b.onclick = () => { document.getElementById('setQ').value = ''; show(b.dataset.cat); window.scrollTo(0, 0); }));
+  show(state.setCat || 'general');
+  document.getElementById('setQ').oninput = (e) => {
+    const q = e.target.value.trim();
+    if (!q) return show(state.setCat || 'general');
+    nav.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+    cards.forEach((c) => (c.hidden = !c.textContent.includes(q) && ![...c.querySelectorAll('input,textarea,select')].some((i) => String(i.value || '').includes(q))));
+  };
   document.getElementById('sf').onsubmit = async (e) => { e.preventDefault(); try { await save(); toast('ההגדרות נשמרו'); renderSettings(); } catch (err) { toast(err.message, true); } };
   document.getElementById('testMail').onclick = async () => {
     try { await save(); await api('POST', '/api/settings/test-email', { to: document.getElementById('testTo').value }); toast('מייל הבדיקה נשלח – השליחה הופעלה'); renderSettings(); } catch (err) { toast(err.message, true); }
@@ -1011,7 +1059,7 @@ async function route() {
     else if (h.startsWith('#/automation') && isAdmin()) await renderAutomation();
     else if (h.startsWith('#/settings') && isAdmin()) await renderSettings();
     else if (h.startsWith('#/report') && can('export')) await renderReport();
-    else if (h.startsWith('#/today') || !can('control')) await renderToday();
+    else if (h.startsWith('#/today') || !can('control') || (state.prefs && state.prefs.adminHome === 'today')) await renderToday();
     else await renderControl(); // דף הבית: מסך בקרה (למי שיש לו הרשאה)
     window.scrollTo(0, 0);
   } catch (e) {
@@ -1046,7 +1094,8 @@ async function boot() {
   state.orgName = r.orgName || state.orgName;
   state.me = r.user;
   state.tabIcons = r.tabIcons || {};
-  state.hebToday = r.hebToday || ''; state.sendBlock = r.sendBlock || null;
+  state.hebToday = r.hebToday || ''; state.sendBlock = r.sendBlock || null; state.prefs = r.prefs || {};
+  applyAccent(state.prefs.accent);
   setFavicon(r.hasFavicon);
   if (!r.user) return renderLogin(r.needsSetup);
   if (!state.stats) state.stats = await api('GET', '/api/stats').catch(() => null);

@@ -54,7 +54,7 @@ const userName = (id) => (id ? (db.prepare('SELECT full_name FROM users WHERE id
 app.get('/api/me', (req, res) => {
   const hasAdmin = !!db.prepare("SELECT 1 FROM users WHERE role='admin' AND password_hash IS NOT NULL").get();
   const user = req.user ? { ...req.user, permissions_json: undefined, perms: auth.perms(req.user), canResetPw: ['code', 'google'].includes(req.user.session_via) } : null;
-  res.json({ user, needsSetup: !hasAdmin, orgName: getSetting('org_name'), tabIcons: (() => { try { return JSON.parse(getSetting('tab_icons') || '{}'); } catch (_) { return {}; } })(), hasFavicon: !!getSetting('favicon_data'), hebToday: require('./src/calendar').hebDate(new Date()), sendBlock: require('./src/calendar').status() });
+  res.json({ user, needsSetup: !hasAdmin, orgName: getSetting('org_name'), tabIcons: (() => { try { return JSON.parse(getSetting('tab_icons') || '{}'); } catch (_) { return {}; } })(), hasFavicon: !!getSetting('favicon_data'), hebToday: require('./src/calendar').hebDate(new Date()), sendBlock: require('./src/calendar').status(), prefs: { hebDates: getSetting('show_hebrew_dates') !== '0', accent: getSetting('accent_color') || '', adminHome: getSetting('admin_home') || 'control' } });
 });
 
 app.post('/api/setup', (req, res) => {
@@ -1249,7 +1249,7 @@ app.get('/api/imports', (req, res) => {
 // ---------- הגדרות ----------
 const TEXT_KEYS = Object.keys(MSG.DEFAULTS);
 const SETTING_KEYS = [...TEXT_KEYS, 'send_mode', 'voice_days', 'voice_hour_start', 'voice_hour_end', 'monthly_enabled', 'monthly_day', 'expiry_enabled', 'expiry_days',
-  'office_phone', 'warm_check', 'callback_same_minutes', 'google_client_id', 'shabbat_stop_minutes', 'shabbat_resume', 'block_chol_hamoed', 'block_tisha_bav', 'tts_rate', 'tts_voice', 'google_tts_key', 'google_tts_voice', 'transcription_mode', 'stt_openai_key', 'stt_openai_model', 'tab_icons', 'yemot_system', 'yemot_password', 'yemot_template_id', 'yemot_ivr_path', 'yemot_caller_id', 'nedarim_target', 'email_provider', 'brevo_api_key', 'email_from_name', 'new_contact_days', 'escalate_days', 'morning_hour', 'nudge_hour', 'urgent_hours', 'org_name', 'stale_days', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from', 'phone_provider', 'phone_api_url', 'phone_api_key', 'phone_caller_id', 'phone_message'];
+  'office_phone', 'show_hebrew_dates', 'accent_color', 'admin_home', 'session_days', 'daily_call_limit', 'retry_unanswered_hours', 'retry_unanswered_max', 'min_days_between_auto', 'warm_check', 'callback_same_minutes', 'google_client_id', 'shabbat_stop_minutes', 'shabbat_resume', 'block_chol_hamoed', 'block_tisha_bav', 'tts_rate', 'tts_voice', 'google_tts_key', 'google_tts_voice', 'transcription_mode', 'stt_openai_key', 'stt_openai_model', 'tab_icons', 'yemot_system', 'yemot_password', 'yemot_template_id', 'yemot_ivr_path', 'yemot_caller_id', 'nedarim_target', 'email_provider', 'brevo_api_key', 'email_from_name', 'new_contact_days', 'escalate_days', 'morning_hour', 'nudge_hour', 'urgent_hours', 'org_name', 'stale_days', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from', 'phone_provider', 'phone_api_url', 'phone_api_key', 'phone_caller_id', 'phone_message'];
 app.get('/api/settings', auth.requireAdmin, (req, res) => {
   const out = {};
   for (const k of SETTING_KEYS) out[k] = getSetting(k);

@@ -270,6 +270,10 @@ function queueMessage(contactId, { waitFor = null, caseIds = null, eventIds = nu
   if (!ph) return { skipped: 'no_phone' };
   // מניעת כפילות: כבר יש הודעה שממתינה / בשליחה לאותו אדם
   if (db.prepare("SELECT 1 FROM voice_calls WHERE contact_id = ? AND status IN ('queued','sending') ").get(contactId)) return { skipped: 'already_queued' };
+  // הודעות אוטומטיות: לא יותר מהודעה אחת לאדם בכל X ימים (0 = בלי הגבלה). הודעה ידנית – תמיד מותרת
+  const gap = +(getSetting('min_days_between_auto') || 0);
+  if (gap > 0 && ['auto_reminder', 'monthly_no_method', 'expiry'].includes(trigger)
+    && db.prepare("SELECT 1 FROM voice_calls WHERE contact_id = ? AND trigger NOT IN ('login_code','warmup','inbound') AND julianday('now','localtime') - julianday(created_at) < ?").get(contactId, gap)) return { skipped: 'too_soon' };
   const m = buildMessage(contactId, { caseIds, eventIds, trigger, reminderNo, expiry });
   if (!m) return { skipped: 'not_found' };
   if (!m.caseIds.length && !['monthly_no_method', 'expiry'].includes(trigger)) return { skipped: 'nothing_open' };

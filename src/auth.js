@@ -1,8 +1,8 @@
 // כניסה מאובטחת: סיסמאות מוצפנות ב-scrypt, עוגיית סשן HttpOnly, הרשאות לפי תפקיד
 const crypto = require('crypto');
-const { db } = require('./db');
+const { db, getSetting } = require('./db');
 
-const SESSION_DAYS = 14;
+const sessionDays = () => Math.max(1, Math.min(90, +(getSetting('session_days') || 14) || 14)); // כמה ימים נשארים מחוברים
 const COOKIE = 'yr_session';
 
 function hashPassword(pw) {
@@ -29,9 +29,9 @@ function parseCookies(req) {
 
 function createSession(res, userId, secure, via = 'password') {
   const token = crypto.randomBytes(32).toString('hex');
-  const exp = new Date(Date.now() + SESSION_DAYS * 864e5);
+  const exp = new Date(Date.now() + sessionDays() * 864e5);
   db.prepare('INSERT INTO sessions (token, user_id, expires_at, via) VALUES (?, ?, ?, ?)').run(token, userId, exp.toISOString(), via);
-  res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_DAYS * 86400}${secure ? '; Secure' : ''}`);
+  res.setHeader('Set-Cookie', `${COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionDays() * 86400}${secure ? '; Secure' : ''}`);
 }
 function destroySession(req, res) {
   const t = parseCookies(req)[COOKIE];
