@@ -1,0 +1,22 @@
+{
+  "name": "yeshiva-returns",
+  "version": "1.0.0",
+  "description": "מערכת ניהול החזרות הוראות קבע – ישיבת סלונים",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@hebcal/core": "^5.10.1",
+    "@huggingface/transformers": "^3.8.1",
+    "better-sqlite3": "^13.0.3",
+    "exceljs": "^4.4.0",
+    "express": "^4.22.3",
+    "ffmpeg-static": "^5.3.0",
+    "nodemailer": "^10.3.1"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "private": true
+}
