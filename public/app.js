@@ -411,13 +411,28 @@ async function renderCase(id) {
       <div>
         <div class="card">
           <div class="row" style="justify-content:space-between"><h2 style="margin:0">${c.source_kind === 'payment_methods' ? 'פרטי אמצעי תשלום' : 'חיובים שחזרו'}</h2><button class="btn sm" id="addEv">הוספת חיוב ידנית</button></div><div style="height:10px"></div>
-          <div class="table-wrap"><table><thead><tr><th>תאריך</th><th class="num">סכום</th><th>סעיף חיוב</th><th>סיבת החזרה</th><th>קוד</th>${events.some((e) => e.payment_method || e.method_status || e.expiry) ? '<th>אמצעי תשלום</th><th>מצב</th><th>תוקף</th>' : ''}<th>אסמכתא</th><th>בנק / סניף / חשבון</th><th>מקור</th><th>סטטוס ההוראה</th>${can('delete') ? '<th></th>' : ''}</tr></thead><tbody>
-          ${events.map((e) => `<tr><td class="nowrap">${fdate(e.charge_date)}</td><td class="num">${money(e.amount)}</td><td><strong>${esc(e.charge_item || '')}</strong>${can('edit_contacts') ? ` <button class="btn sm" data-evedit="${e.id}" title="עדכון סעיף ומועד פקיעת תוקף">✎</button>` : ''}</td><td>${esc(e.reason)}</td><td>${esc(e.reason_code)}</td>
-            ${events.some((x) => x.payment_method || x.method_status || x.expiry) ? `<td>${esc(e.payment_method || '')}</td><td>${esc(e.method_status || '')}</td><td class="nowrap">${esc(e.expiry || '')}</td>` : ''}<td>${esc(e.reference)}</td>
-            <td class="nowrap small">${esc([e.bank, e.branch, e.account].filter(Boolean).join(' / '))}</td><td class="small muted">${esc(e.period_label || e.filename || '')}</td>
-            <td style="min-width:150px">${e.status === 'resolved' ? `<span class="badge st-resolved">הוסדרה</span>${can('change_status') ? ` <button class="btn sm" data-evst="${e.id}" data-to="open">פתיחה מחדש</button>` : ''}` : `<span class="badge st-in_progress">פתוחה</span>${can('change_status') ? ` <button class="btn sm" data-evst="${e.id}" data-to="resolved">סימון כהוסדרה</button>` : ''}${can('send_voice') ? ` <button class="btn sm" data-evvoice="${e.id}" title="הודעה קולית רק על הוראה זו">📞 הודעה רק עליה</button>` : ''}`}</td>
-            ${can('delete') ? `<td><button class="btn sm danger" data-delev="${e.id}">מחיקה</button></td>` : ''}</tr>`).join('')}
-          </tbody><tfoot><tr><td><strong>סה"כ</strong></td><td class="num"><strong>${money(c.total_amount)}</strong></td><td colspan="9"></td></tr></tfoot></table></div>
+          ${(() => {
+            // עמודות שמוצגות רק אם יש בהן מידע באחת השורות – כדי שהטבלה תיכנס במסך בלי גלילה הצידה
+            const has = (f) => events.some((e) => f(e));
+            const cols = [
+              ['תאריך', (e) => `<span class="nowrap">${fdate(e.charge_date)}</span>`, true],
+              ['סכום', (e) => money(e.amount), true, 'num'],
+              ['סעיף חיוב', (e) => `<strong>${esc(e.charge_item || '—')}</strong>${can('edit_contacts') ? ` <button class="btn sm ic-btn" data-evedit="${e.id}" title="עדכון סעיף ומועד פקיעת תוקף">✎</button>` : ''}`, true, 'col-item'],
+              ['סיבה', (e) => `${esc(e.reason || '')}${e.reason_code ? ` <span class="muted small">(${esc(e.reason_code)})</span>` : ''}`, has((e) => e.reason || e.reason_code)],
+              ['אמצעי תשלום', (e) => `${esc(e.payment_method || '')}${e.method_status ? `<div class="small muted">${esc(e.method_status)}</div>` : ''}`, has((e) => e.payment_method || e.method_status)],
+              ['תוקף', (e) => `<span class="nowrap">${esc(e.expiry || '')}</span>`, has((e) => e.expiry)],
+              ['אסמכתא', (e) => esc(e.reference || ''), has((e) => e.reference)],
+              ['בנק / סניף / חשבון', (e) => `<span class="small">${esc([e.bank, e.branch, e.account].filter(Boolean).join(' / '))}</span>`, has((e) => e.bank || e.branch || e.account)],
+              ['מקור', (e) => `<span class="small muted">${esc(e.period_label || e.filename || '')}</span>`, has((e) => e.period_label || e.filename)],
+              ['מצב ההוראה', (e) => e.status === 'resolved'
+                ? `<span class="badge st-resolved">הוסדרה</span>${can('change_status') ? ` <button class="btn sm" data-evst="${e.id}" data-to="open" title="פתיחה מחדש">↺</button>` : ''}`
+                : `<span class="badge st-in_progress">פתוחה</span><div class="ev-acts">${can('change_status') ? `<button class="btn sm" data-evst="${e.id}" data-to="resolved" title="סימון שההוראה הוסדרה">✓ הוסדרה</button>` : ''}${can('send_voice') ? `<button class="btn sm" data-evvoice="${e.id}" title="הודעה קולית רק על הוראה זו">📞 הודעה</button>` : ''}</div>`, true],
+              ['', (e) => `<button class="btn sm danger ic-btn" data-delev="${e.id}" title="מחיקת השורה">🗑</button>`, can('delete')],
+            ].filter((c) => c[2]);
+            return `<div class="table-wrap"><table class="ev-table"><thead><tr>${cols.map((c) => `<th class="${c[3] || ''}">${c[0]}</th>`).join('')}</tr></thead><tbody>
+              ${events.map((e) => `<tr>${cols.map((c) => `<td class="${c[3] || ''}">${c[1](e)}</td>`).join('')}</tr>`).join('')}
+            </tbody><tfoot><tr><td><strong>סה"כ</strong></td><td class="num"><strong>${money(c.total_amount)}</strong></td><td colspan="${cols.length - 2}"></td></tr></tfoot></table></div>`;
+          })()}
         </div>
         <div class="card">
           <h2>תיעוד פעולה / שיחה</h2>
